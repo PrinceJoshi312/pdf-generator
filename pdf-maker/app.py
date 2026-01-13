@@ -229,6 +229,7 @@ elif mode == "Invoice → PDF":
                 "invoice.pdf"
             )
 
+
 # ---------- FOOTER ----------
 st.markdown("---")
 st.caption("PDF Maker Pro • Text • Images • Invoices • Secure")

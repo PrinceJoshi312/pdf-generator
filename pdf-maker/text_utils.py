@@ -48,6 +48,7 @@ def markdown_to_text(text: str) -> str:
     text = re.sub(r"__(.*?)__", r"\1", text)
     text = re.sub(r"_(.*?)_", r"\1", text)
 
+
     # Inline code
     text = re.sub(r"`(.*?)`", r"\1", text)
 

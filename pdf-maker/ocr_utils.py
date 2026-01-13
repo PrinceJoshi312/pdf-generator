@@ -1,5 +1,6 @@
 import pytesseract
 
+
 def extract_text_from_images(images):
     try:
         text = ""

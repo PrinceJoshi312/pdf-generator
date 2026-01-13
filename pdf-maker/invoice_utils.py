@@ -77,6 +77,7 @@ def generate_invoice_pdf(data: dict):
 
     # ----- FOOTER -----
     y -= 40
+    
     c.setFont("Helvetica", 10)
     c.drawString(40, y, data["notes"])
 

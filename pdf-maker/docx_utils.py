@@ -2,6 +2,7 @@ from docx import Document
 
 def generate_docx(text):
     doc = Document()
+    
     for line in text.split("\n"):
         p = doc.add_paragraph()
         run = p.add_run(line)

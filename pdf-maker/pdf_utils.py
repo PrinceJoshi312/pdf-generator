@@ -140,6 +140,7 @@ def generate_cover_page(title, subtitle="", footer=""):
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
+
     c.setFont("Helvetica-Bold", 28)
     c.drawCentredString(width / 2, height - 200, title)
 

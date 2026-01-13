@@ -17,6 +17,7 @@ def protect_pdf(
     permissions = set()
     if allow_printing:
         permissions.add("print")
+        
     if allow_copying:
         permissions.add("copy")
 
