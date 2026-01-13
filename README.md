@@ -1,3 +1,4 @@
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 
 # 📄 PDF Maker Pro
@@ -144,6 +145,10 @@ pdf-maker/
 
 ## ⚙️ Technical Notes
 
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+![PDF](https://img.shields.io/badge/PDF-Automation-green)
+
 ### Text Processing
 
 * Cleans OCR and pasted text automatically
@@ -177,23 +182,12 @@ pdf-maker/
 
 ---
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue)
-![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
-![PDF](https://img.shields.io/badge/PDF-Automation-green)
----
-
 ## 🚀 Future Improvements (Planned)
 
 * Live PDF preview
 * Logo upload for invoices
 * Header/footer customization
 * Cloud deployment support
-
----
-
-## 📜 License
-
-Provided as-is for educational and professional use.
 
 ---
 
@@ -204,6 +198,11 @@ Provided as-is for educational and professional use.
 * **Pillow**
 * **PyPDF2**
 * **Tesseract OCR**
+
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
