@@ -1,189 +1,234 @@
 import streamlit as st
 from PIL import Image
-import pyperclip
+import re
+from datetime import date
 
-from pdf_utils import generate_text_pdf, generate_image_pdf
-from text_utils import wrap_text
+# ---------- INTERNAL IMPORTS ----------
+from pdf_utils import (
+    generate_text_pdf,
+    generate_image_pdf,
+    generate_cover_page,
+    apply_watermark,
+)
+from text_utils import clean_text, markdown_to_text
 from security_utils import protect_pdf
-from ocr_utils import extract_text_from_images
-from ui_components import sidebar, footer
+from invoice_utils import generate_invoice_pdf
 
-# ------------------ CONFIG ------------------
+# OCR (optional)
+try:
+    from ocr_utils import extract_text_from_images
+    OCR_AVAILABLE = True
+except Exception:
+    OCR_AVAILABLE = False
+
+# ---------- PAGE CONFIG ----------
 st.set_page_config(
-    page_title="PDF Converter Pro",
+    page_title="PDF Maker Pro",
     page_icon="📄",
     layout="wide"
 )
 
-sidebar()
+st.title("📄 PDF Maker Pro")
+st.caption("Text • Images • Invoices • Secure PDFs")
 
-st.markdown("## PDF Converter Pro")
-st.caption("Clean, professional PDF generation for text and images")
-st.divider()
+# ---------- SIDEBAR ----------
+mode = st.sidebar.radio(
+    "Choose Mode",
+    ["Text → PDF", "Image → PDF", "Invoice → PDF"]
+)
 
-# ------------------ SESSION STATE INIT ------------------
-if "font_size" not in st.session_state:
-    st.session_state.font_size = 20
-    st.session_state.line_spacing = 26
-    st.session_state.margin = 50
-
-# ------------------ TABS ------------------
-tab_text, tab_image = st.tabs(["Text → PDF", "Image → PDF"])
+font_size = st.sidebar.slider(
+    "Font Size",
+    min_value=12,
+    max_value=22,
+    value=12
+)
 
 # ==================================================
 # 📝 TEXT → PDF
 # ==================================================
-with tab_text:
-    left, right = st.columns([1.1, 1.9])
+if mode == "Text → PDF":
+    st.subheader("📝 Text / Markdown to PDF")
 
-    # ---------- LEFT PANEL ----------
-    with left:
-        st.markdown("### Document Settings")
+    uploaded = st.file_uploader(
+        "Upload .txt / .md file",
+        type=["txt", "md"]
+    )
 
-        preset = st.radio(
-            "Preset",
-            ["Custom", "Worksheet", "Answer Key", "Notes"],
-            key="preset_radio"
-        )
+    raw_text = uploaded.read().decode("utf-8", errors="ignore") if uploaded else ""
 
-        # Apply presets to session state
-        if preset == "Worksheet":
-            st.session_state.font_size = 18
-            st.session_state.line_spacing = 28
-            st.session_state.margin = 60
-        elif preset == "Answer Key":
-            st.session_state.font_size = 20
-            st.session_state.line_spacing = 26
-            st.session_state.margin = 50
-        elif preset == "Notes":
-            st.session_state.font_size = 16
-            st.session_state.line_spacing = 24
-            st.session_state.margin = 40
+    text = st.text_area(
+        "Paste text here (Ctrl+V supported)",
+        value=raw_text,
+        height=320
+    )
 
-        if preset == "Custom":
-            st.session_state.font_size = st.slider(
-                "Font size", 12, 30, st.session_state.font_size, key="font_slider"
-            )
-            st.session_state.line_spacing = st.slider(
-                "Line spacing", 16, 40, st.session_state.line_spacing, key="line_slider"
-            )
-            st.session_state.margin = st.slider(
-                "Page margin", 30, 80, st.session_state.margin, key="margin_slider"
-            )
+    academic = st.checkbox("🎓 Academic formatting", True)
+    markdown = st.checkbox("🧾 Markdown support", True)
 
-        st.divider()
+    st.divider()
+    st.subheader("🔐 Security & Layout")
 
-        show_footer = st.checkbox("Show page numbers", True, key="footer_text")
+    use_cover = st.checkbox("📘 Add cover page")
+    cover_title = cover_sub = cover_footer = ""
+    if use_cover:
+        cover_title = st.text_input("Cover title")
+        cover_sub = st.text_input("Subtitle")
+        cover_footer = st.text_input("Footer")
 
-        lock_pdf = st.checkbox("Password protect PDF", key="lock_text_pdf")
-        password = None
-        if lock_pdf:
-            password = st.text_input("Password", type="password", key="text_pass")
+    watermark = st.checkbox("💧 Watermark")
+    watermark_text = st.text_input("Watermark text") if watermark else ""
 
-    # ---------- RIGHT PANEL ----------
-    with right:
-        st.markdown("### Input")
+    lock_pdf = st.checkbox("🔐 Password protect PDF")
+    user_pw = owner_pw = None
+    allow_print = allow_copy = False
 
-        uploaded = st.file_uploader("Upload .txt file", type=["txt"])
-        use_clipboard = st.checkbox("Use clipboard text", key="clip_text")
+    if lock_pdf:
+        user_pw = st.text_input("User password", type="password")
+        owner_pw = st.text_input("Owner password (optional)", type="password")
+        allow_print = st.checkbox("Allow printing")
+        allow_copy = st.checkbox("Allow copying")
 
-        generate_text_btn = st.button(
-            "Generate PDF",
-            use_container_width=True,
-            key="generate_text_pdf"
-        )
+    if st.button("📄 Generate PDF", use_container_width=True):
+        if not text.strip():
+            st.warning("No text provided.")
+        else:
+            text = clean_text(text)
+            if markdown:
+                text = markdown_to_text(text)
 
-        if generate_text_btn:
-            if use_clipboard:
-                raw_text = pyperclip.paste()
-                if not raw_text or not raw_text.strip():
-                    st.error("Clipboard is empty or contains only whitespace.")
-                    st.stop()
-            elif uploaded:
-                raw_text = uploaded.read().decode("utf-8", errors="ignore")
-            else:
-                st.warning("Upload a file or enable clipboard text.")
-                st.stop()
-
-            wrapped = wrap_text(raw_text)
-
-            with st.spinner("Generating PDF..."):
-                pdf = generate_text_pdf(
-                    wrapped,
-                    st.session_state.font_size,
-                    st.session_state.line_spacing,
-                    st.session_state.margin,
-                    header=None,
-                    footer=show_footer
+            if academic:
+                text = re.sub(
+                    r"(UNIT\s+[IVX]+|Section\s+[A-Z])",
+                    r"\n\n\1\n" + "-" * 40,
+                    text
                 )
 
-                if lock_pdf and password:
-                    pdf = protect_pdf(pdf, password)
+            pdf = generate_text_pdf(text, font_size=font_size)
 
-            st.success("PDF ready")
-            st.download_button(
-                "Download PDF",
-                pdf,
-                "text_output.pdf",
-                use_container_width=True
-            )
+            if use_cover:
+                pdf = generate_cover_page(
+                    cover_title, cover_sub, cover_footer
+                ) + pdf
+
+            if watermark and watermark_text:
+                pdf = apply_watermark(pdf, watermark_text)
+
+            if lock_pdf and user_pw:
+                pdf = protect_pdf(
+                    pdf, user_pw, owner_pw, allow_print, allow_copy
+                )
+
+            st.success("PDF generated")
+            st.download_button("⬇ Download PDF", pdf, "text.pdf")
 
 # ==================================================
-# 🖼️ IMAGE → PDF
+# 🖼 IMAGE → PDF
 # ==================================================
-with tab_image:
-    left, right = st.columns([1.1, 1.9])
+elif mode == "Image → PDF":
+    st.subheader("🖼 Image to PDF")
+    st.info("Paste images using Ctrl+V or upload files")
 
-    with left:
-        st.markdown("### Image Options")
+    images = st.file_uploader(
+        "Upload images",
+        type=["png", "jpg", "jpeg"],
+        accept_multiple_files=True
+    )
 
-        use_ocr = st.checkbox("Extract text using OCR", key="use_ocr")
-        lock_pdf_img = st.checkbox("Password protect PDF", key="lock_image_pdf")
+    use_ocr = st.checkbox(
+        "🧠 Extract text (OCR)",
+        disabled=not OCR_AVAILABLE
+    )
 
-        password_img = None
-        if lock_pdf_img:
-            password_img = st.text_input(
-                "Password",
-                type="password",
-                key="img_pass"
-            )
+    lock_img = st.checkbox("🔐 Password protect PDF")
+    img_pw = st.text_input("Password", type="password") if lock_img else None
 
-    with right:
-        images = st.file_uploader(
-            "Upload images",
-            type=["png", "jpg", "jpeg"],
-            accept_multiple_files=True
+    if images:
+        pil_images = [Image.open(i).convert("RGB") for i in images]
+        st.image(pil_images, width=150)
+
+        if st.button("📄 Generate Image PDF", use_container_width=True):
+            if use_ocr and OCR_AVAILABLE:
+                text = extract_text_from_images(pil_images)
+                text = clean_text(text)
+                pdf = generate_text_pdf(text, font_size=font_size)
+            else:
+                pdf = generate_image_pdf(pil_images)
+
+            if lock_img and img_pw:
+                pdf = protect_pdf(pdf, img_pw)
+
+            st.success("PDF generated")
+            st.download_button("⬇ Download PDF", pdf, "images.pdf")
+
+# ==================================================
+# 🧾 INVOICE → PDF
+# ==================================================
+elif mode == "Invoice → PDF":
+    st.subheader("🧾 Invoice Generator")
+
+    template = st.selectbox(
+        "Invoice Template",
+        ["Freelance", "Company", "Retail (GST)", "International"]
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        seller = st.text_input("Your Name / Company")
+        contact = st.text_input("Contact Details")
+    with col2:
+        client = st.text_input("Client Name")
+        invoice_no = st.text_input(
+            "Invoice Number",
+            f"INV-{date.today().strftime('%Y%m%d')}"
         )
 
-        generate_img_btn = st.button(
-            "Generate PDF",
-            use_container_width=True,
-            key="generate_image_pdf"
-        )
+    currency = "₹"
+    tax_rate = 0.0
+    if template == "Retail (GST)":
+        tax_rate = st.slider("GST %", 0, 28, 18) / 100
+    elif template == "International":
+        currency = "USD"
+        tax_rate = st.slider("Tax %", 0, 30, 0) / 100
 
-        if images and generate_img_btn:
-            imgs = [Image.open(i) for i in images]
+    st.subheader("Items")
+    items = []
+    for i in range(3):
+        c1, c2, c3 = st.columns(3)
+        desc = c1.text_input(f"Description {i+1}")
+        qty = c2.number_input(f"Qty {i+1}", min_value=0, step=1)
+        rate = c3.number_input(f"Rate {i+1}", min_value=0)
 
-            with st.spinner("Processing images..."):
-                if use_ocr:
-                    raw_text = extract_text_from_images(imgs)
-                    if not raw_text.strip():
-                        st.error("OCR did not detect any text.")
-                        st.stop()
-                    wrapped = wrap_text(raw_text)
-                    pdf = generate_text_pdf(wrapped)
-                else:
-                    pdf = generate_image_pdf(imgs)
+        if desc:
+            items.append({"desc": desc, "qty": qty, "rate": rate})
 
-                if lock_pdf_img and password_img:
-                    pdf = protect_pdf(pdf, password_img)
+    notes = st.text_area("Notes", "Thank you for your business!")
 
-            st.success("PDF ready")
+    if st.button("📄 Generate Invoice PDF", use_container_width=True):
+        if not seller or not client or not items:
+            st.warning("Fill all required fields.")
+        else:
+            data = {
+                "seller": seller,
+                "seller_contact": contact,
+                "client": client,
+                "invoice_no": invoice_no,
+                "date": date.today().strftime("%d %b %Y"),
+                "items": items,
+                "tax_rate": tax_rate,
+                "currency": currency,
+                "notes": notes,
+            }
+
+            pdf = generate_invoice_pdf(data)
+
+            st.success("Invoice generated")
             st.download_button(
-                "Download PDF",
+                "⬇ Download Invoice",
                 pdf,
-                "image_output.pdf",
-                use_container_width=True
+                "invoice.pdf"
             )
 
-footer()
+# ---------- FOOTER ----------
+st.markdown("---")
+st.caption("PDF Maker Pro • Text • Images • Invoices • Secure")

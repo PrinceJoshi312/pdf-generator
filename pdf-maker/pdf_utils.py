@@ -1,75 +1,157 @@
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+# pdf_utils.py
+from io import BytesIO
+import os
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Image
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from PIL import Image
-import io
+from reportlab.lib.pagesizes import A4
 
-pdfmetrics.registerFont(TTFont("DejaVu", "DejaVuSans.ttf"))
+# ---------------- FONT REGISTRATION ----------------
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
+REGULAR_FONT = os.path.join(FONT_DIR, "DejaVuSans.ttf")
+BOLD_FONT = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
 
-def generate_image_pdf(images, margin=50):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+pdfmetrics.registerFont(TTFont("DejaVu", REGULAR_FONT))
+pdfmetrics.registerFont(TTFont("DejaVu-Bold", BOLD_FONT))
+
+# ---------------- STYLES ----------------
+
+styles = getSampleStyleSheet()
+
+BODY_STYLE = ParagraphStyle(
+    "Body",
+    parent=styles["Normal"],
+    fontName="DejaVu",
+    fontSize=12,
+    leading=12,
+    spaceBefore=0,
+    spaceAfter=0
+)
+
+HEADING_STYLE = ParagraphStyle(
+    "Heading",
+    parent=styles["Normal"],
+    fontName="DejaVu-Bold",
+    fontSize=18,
+    leading=18,
+    spaceBefore=6,
+    spaceAfter=6
+)
+
+# ---------------- TEXT → PDF ----------------
+
+def generate_text_pdf(text: str) -> bytes:
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=0,
+        leftMargin=0,
+        topMargin=0,
+        bottomMargin=0
+    )
+
+    story = []
+
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+
+        # Simple heading detection
+        if line.isupper() or len(line) < 40:
+            story.append(Paragraph(line, HEADING_STYLE))
+        else:
+            story.append(Paragraph(line, BODY_STYLE))
+
+    doc.build(story)
+    return buffer.getvalue()
+
+# ---------------- IMAGE → PDF ----------------
+
+def generate_image_pdf(images) -> bytes:
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=0,
+        leftMargin=0,
+        topMargin=0,
+        bottomMargin=0
+    )
+
+    story = []
 
     for img in images:
-        img = img.convert("RGB")
-        iw, ih = img.size
-        scale = min(
-            (width - 2 * margin) / iw,
-            (height - 2 * margin) / ih
-        )
-        nw, nh = iw * scale, ih * scale
-        x = (width - nw) / 2
-        y = (height - nh) / 2
+        img_io = BytesIO()
+        img.save(img_io, format="PNG")
+        img_io.seek(0)
 
-        c.drawInlineImage(img, x, y, nw, nh)
-        c.showPage()
+        image = Image(img_io)
+        image._restrictSize(A4[0], A4[1])
+        story.append(image)
 
-    c.save()
+    doc.build(story)
     return buffer.getvalue()
 
 
-def generate_text_pdf(
-    text,
-    font_size=20,
-    line_spacing=26,
-    margin=50,
-    header=None,
-    footer=True
-):
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+import io
+
+def apply_watermark(pdf_bytes: bytes, watermark_text: str):
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+
+    packet = io.BytesIO()
+    can = canvas.Canvas(packet, pagesize=letter)
+    can.setFont("Helvetica-Bold", 40)
+    can.setFillGray(0.85)
+    can.saveState()
+    can.translate(300, 400)
+    can.rotate(45)
+    can.drawCentredString(0, 0, watermark_text)
+    can.restoreState()
+    can.save()
+
+    packet.seek(0)
+    watermark = PdfReader(packet).pages[0]
+
+    for page in reader.pages:
+        page.merge_page(watermark)
+        writer.add_page(page)
+
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
+def generate_cover_page(title, subtitle="", footer=""):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    text_obj = c.beginText(margin, height - margin)
-    text_obj.setFont("DejaVu", font_size)
-    text_obj.setLeading(line_spacing)
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(width / 2, height - 200, title)
 
-    page_number = 1
-
-    for line in text.split("\n"):
-        if text_obj.getY() < margin:
-            if footer:
-                c.drawRightString(
-                    width - margin,
-                    20,
-                    f"Page {page_number}"
-                )
-            c.showPage()
-            page_number += 1
-            text_obj = c.beginText(margin, height - margin)
-            text_obj.setFont("DejaVu", font_size)
-            text_obj.setLeading(line_spacing)
-
-        text_obj.textLine(line)
-
-    c.drawText(text_obj)
+    if subtitle:
+        c.setFont("Helvetica", 16)
+        c.drawCentredString(width / 2, height - 260, subtitle)
 
     if footer:
-        c.drawRightString(width - margin, 20, f"Page {page_number}")
+        c.setFont("Helvetica", 12)
+        c.drawCentredString(width / 2, 100, footer)
 
+    c.showPage()
     c.save()
+
     return buffer.getvalue()

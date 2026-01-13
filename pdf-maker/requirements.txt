@@ -2,3 +2,7 @@ streamlit
 reportlab
 pillow
 pyperclip
+python-docx
+pytesseract
+opencv-python-headless
+pypdf
