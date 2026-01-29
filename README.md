@@ -1,170 +1,212 @@
-# PDF Converter Pro 📄
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-A streamlit-based web application for converting text and images into professional, clean PDFs with advanced customization options.
 
-## Features
+# 📄 PDF Maker Pro
 
-### Text to PDF Conversion
-- Convert plain text files (.txt) to formatted PDFs
-- Use clipboard text directly as input
-- Multiple preset templates (Worksheet, Answer Key, Notes)
-- Full customization control:
-  - Font size (12-30pt)
-  - Line spacing (16-40pt)
-  - Page margins (30-80pt)
-- Optional page numbering
-- Password protection for sensitive documents
+A Streamlit-based web application for generating **professional PDFs** from **text, images, and invoices**, with support for OCR, password protection, watermarks, and cover pages.
 
-### Image to PDF Conversion
-- Convert multiple images (PNG, JPG, JPEG) into a single PDF
-- OCR (Optical Character Recognition) support to extract text from images
-- Batch processing for multiple images
-- Password protection support
+---
 
-## Installation
+## ✨ Features
+
+### 📝 Text → PDF
+
+* Convert **plain text or Markdown** into clean PDFs
+* Paste text directly (clipboard supported via Ctrl+V)
+* Optional **academic formatting**
+* Markdown rendering support
+* Customizable font size (12–22 pt)
+* Optional:
+
+  * Cover page (title, subtitle, footer)
+  * Watermark
+  * Password protection
+
+---
+
+### 🖼 Image → PDF
+
+* Convert one or more images (PNG, JPG, JPEG) into a single PDF
+* Optional **OCR (Optical Character Recognition)**:
+
+  * Extracts text from images
+  * Converts extracted text into a text-based PDF
+* Supports password-protected image PDFs
+
+---
+
+### 🧾 Invoice → PDF
+
+* Generate professional invoices in PDF format
+* Built-in templates:
+
+  * Freelance
+  * Company
+  * Retail (GST)
+  * International
+* Features:
+
+  * Itemized billing
+  * Automatic totals and tax calculation
+  * Currency handling (₹ / USD)
+  * Notes section
+* Ready-to-send invoice PDFs
+
+---
+
+## 🔐 Security Features
+
+* Password protection for PDFs
+* Separate user and owner passwords (where supported)
+* Optional permissions:
+
+  * Allow printing
+  * Allow copying
+
+---
+
+## 📦 Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip package manager
 
-### Required Dependencies
+* Python **3.8+**
+* pip
+
+### Install Dependencies
 
 ```bash
-pip install streamlit pillow pyperclip
+pip install streamlit pillow reportlab PyPDF2 pytesseract
 ```
 
-### Additional Dependencies
-The application also requires the following custom modules (ensure these are in your project directory):
-- `pdf_utils.py` - PDF generation utilities
-- `text_utils.py` - Text processing and wrapping
-- `security_utils.py` - PDF password protection
-- `ocr_utils.py` - OCR text extraction
-- `ui_components.py` - Sidebar and footer components
+> ⚠️ For OCR support, ensure **Tesseract OCR** is installed and available in PATH.
 
-## Usage
+---
 
-### Starting the Application
+## ▶️ Usage
+
+### Run the App
 
 ```bash
 streamlit run app.py
 ```
 
-The application will open in your default web browser at `http://localhost:8501`
-
-### Text to PDF Workflow
-
-1. Navigate to the **Text → PDF** tab
-2. Configure document settings:
-   - Select a preset (Worksheet, Answer Key, Notes) or use Custom settings
-   - Adjust font size, line spacing, and margins as needed
-   - Toggle page numbers on/off
-   - Optionally enable password protection
-3. Provide input text:
-   - Upload a .txt file, OR
-   - Enable "Use clipboard text" to paste from clipboard
-4. Click **Generate PDF**
-5. Download your formatted PDF
-
-### Image to PDF Workflow
-
-1. Navigate to the **Image → PDF** tab
-2. Configure options:
-   - Enable "Extract text using OCR" to convert image text to formatted PDF
-   - Optionally enable password protection
-3. Upload one or more image files (PNG, JPG, JPEG)
-4. Click **Generate PDF**
-5. Download your PDF
-
-## Preset Templates
-
-### Worksheet
-- Font size: 18pt
-- Line spacing: 28pt
-- Margin: 60pt
-- Ideal for: Student worksheets, practice exercises
-
-### Answer Key
-- Font size: 20pt
-- Line spacing: 26pt
-- Margin: 50pt
-- Ideal for: Answer sheets, reference documents
-
-### Notes
-- Font size: 16pt
-- Line spacing: 24pt
-- Margin: 40pt
-- Ideal for: Study notes, compact documents
-
-## Security Features
-
-The application supports password-protecting generated PDFs. When enabled:
-- The PDF will require a password to open
-- Useful for sensitive documents or answer keys
-- Separate password options for text and image PDFs
-
-## Project Structure
+Open in browser:
 
 ```
-pdf-converter-pro/
-├── app.py                 # Main application file
-├── pdf_utils.py          # PDF generation functions
-├── text_utils.py         # Text processing utilities
-├── security_utils.py     # PDF encryption/protection
-├── ocr_utils.py          # OCR text extraction
-├── ui_components.py      # UI helper components
-└── requirements.txt      # Python dependencies
+http://localhost:8501
 ```
-
-## Technical Details
-
-### Session State Management
-The application uses Streamlit's session state to maintain settings across interactions:
-- `font_size`: Current font size setting
-- `line_spacing`: Current line spacing setting
-- `margin`: Current page margin setting
-
-### Text Processing
-Text input is automatically wrapped to fit page dimensions based on the configured settings, ensuring proper formatting across all pages.
-
-### OCR Processing
-When OCR is enabled for images, the application extracts text from uploaded images and converts it to a formatted text PDF rather than embedding the images directly.
-
-## Troubleshooting
-
-### Empty Clipboard Error
-If you see "Clipboard is empty or contains only whitespace":
-- Ensure you've copied text to your clipboard before enabling the clipboard option
-- Try copying the text again
-
-### OCR No Text Detected
-If OCR doesn't detect text:
-- Verify the image contains readable text
-- Ensure the image quality is sufficient
-- Try adjusting image contrast or resolution
-
-### Password Protection Issues
-- Passwords are case-sensitive
-- Ensure you remember the password - there's no recovery option
-- Test the password immediately after generation
-
-## Contributing
-
-To extend or modify the application:
-1. Fork the repository
-2. Create a feature branch
-3. Implement changes in the appropriate utility module
-4. Test thoroughly with various input types
-5. Submit a pull request
-
-## License
-
-This project is provided as-is for educational and professional use.
-
-## Support
-
-For issues, questions, or feature requests, please open an issue in the project repository.
 
 ---
 
-**Version:** 1.0.0  
-**Built with:** Streamlit, Pillow, PyPDF2/ReportLab
+## 🧭 Application Modes
+
+### Text → PDF
+
+1. Select **Text → PDF**
+2. Paste or upload text (`.txt` / `.md`)
+3. Choose formatting options
+4. Generate and download PDF
+
+---
+
+### Image → PDF
+
+1. Select **Image → PDF**
+2. Upload one or more images
+3. Optionally enable OCR
+4. Generate and download PDF
+
+---
+
+### Invoice → PDF
+
+1. Select **Invoice → PDF**
+2. Choose invoice template
+3. Enter seller, client, and item details
+4. Generate professional invoice PDF
+
+---
+
+## 📁 Project Structure
+
+```
+pdf-maker/
+├── app.py                 # Main Streamlit application
+├── pdf_utils.py           # PDF generation utilities
+├── text_utils.py          # Text cleaning & markdown handling
+├── invoice_utils.py       # Invoice PDF generation
+├── security_utils.py      # PDF password protection
+├── ocr_utils.py           # OCR text extraction (optional)
+├── requirements.txt       # Dependencies
+└── README.md
+```
+
+---
+
+## ⚙️ Technical Notes
+
+![Python](https://img.shields.io/badge/Python-3.8+-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+![PDF](https://img.shields.io/badge/PDF-Automation-green)
+
+### Text Processing
+
+* Cleans OCR and pasted text automatically
+* Markdown is converted to readable PDF-friendly text
+* Academic formatting adds section separators
+
+### OCR Behavior
+
+* OCR is optional and auto-disabled if unavailable
+* If enabled, images are converted to text PDFs
+* If disabled, images are embedded directly
+
+---
+
+## 🧪 Troubleshooting
+
+### OCR Disabled
+
+* Ensure Tesseract OCR is installed
+* Restart terminal after installation
+
+### Empty PDF
+
+* Ensure pasted text is not whitespace
+* OCR images must contain readable text
+
+### Password Issues
+
+* Passwords are case-sensitive
+* No recovery once set
+
+---
+
+## 🚀 Future Improvements (Planned)
+
+* Live PDF preview
+* Logo upload for invoices
+* Header/footer customization
+* Cloud deployment support
+
+---
+
+## 🧠 Built With
+
+* **Streamlit**
+* **ReportLab**
+* **Pillow**
+* **PyPDF2**
+* **Tesseract OCR**
+
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+**Version:** 1.1.0
+**Status:** Stable
+
+
