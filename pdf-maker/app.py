@@ -10,6 +10,14 @@ from pdf_utils import (
     generate_cover_page,
     apply_watermark,
 )
+
+from rag_utils import (
+    extract_pdf_text,
+    chunk_text,
+    build_faiss_index,
+    search,
+)
+
 from text_utils import clean_text, markdown_to_text
 from security_utils import protect_pdf
 from invoice_utils import generate_invoice_pdf
@@ -29,65 +37,29 @@ st.set_page_config(
 )
 
 st.title("📄 PDF Maker Pro")
-st.caption("Text • Images • Invoices • Secure PDFs")
+st.caption("Text • Images • Invoices • Secure • AI PDF Chat")
 
-# ---------- SIDEBAR ----------
-mode = st.sidebar.radio(
-    "Choose Mode",
-    ["Text → PDF", "Image → PDF", "Invoice → PDF"]
-)
+# ---------- GLOBAL SETTINGS ----------
+with st.sidebar:
+    st.subheader("⚙ Global Settings")
+    font_size = st.slider("Font Size", 12, 22, 12)
 
-font_size = st.sidebar.slider(
-    "Font Size",
-    min_value=12,
-    max_value=22,
-    value=12
+# ---------- TABS ----------
+tab_text, tab_image, tab_invoice, tab_rag = st.tabs(
+    ["📝 Text → PDF", "🖼 Image → PDF", "🧾 Invoice → PDF", "🤖 PDF Chat (RAG)"]
 )
 
 # ==================================================
 # 📝 TEXT → PDF
 # ==================================================
-if mode == "Text → PDF":
-    st.subheader("📝 Text / Markdown to PDF")
-
-    uploaded = st.file_uploader(
-        "Upload .txt / .md file",
-        type=["txt", "md"]
-    )
-
+with tab_text:
+    uploaded = st.file_uploader("Upload .txt / .md", ["txt", "md"])
     raw_text = uploaded.read().decode("utf-8", errors="ignore") if uploaded else ""
 
-    text = st.text_area(
-        "Paste text here (Ctrl+V supported)",
-        value=raw_text,
-        height=320
-    )
+    text = st.text_area("Paste text (Ctrl+V)", raw_text, height=320)
 
     academic = st.checkbox("🎓 Academic formatting", True)
     markdown = st.checkbox("🧾 Markdown support", True)
-
-    st.divider()
-    st.subheader("🔐 Security & Layout")
-
-    use_cover = st.checkbox("📘 Add cover page")
-    cover_title = cover_sub = cover_footer = ""
-    if use_cover:
-        cover_title = st.text_input("Cover title")
-        cover_sub = st.text_input("Subtitle")
-        cover_footer = st.text_input("Footer")
-
-    watermark = st.checkbox("💧 Watermark")
-    watermark_text = st.text_input("Watermark text") if watermark else ""
-
-    lock_pdf = st.checkbox("🔐 Password protect PDF")
-    user_pw = owner_pw = None
-    allow_print = allow_copy = False
-
-    if lock_pdf:
-        user_pw = st.text_input("User password", type="password")
-        owner_pw = st.text_input("Owner password (optional)", type="password")
-        allow_print = st.checkbox("Allow printing")
-        allow_copy = st.checkbox("Allow copying")
 
     if st.button("📄 Generate PDF", use_container_width=True):
         if not text.strip():
@@ -101,47 +73,21 @@ if mode == "Text → PDF":
                 text = re.sub(
                     r"(UNIT\s+[IVX]+|Section\s+[A-Z])",
                     r"\n\n\1\n" + "-" * 40,
-                    text
+                    text,
                 )
 
             pdf = generate_text_pdf(text, font_size=font_size)
-
-            if use_cover:
-                pdf = generate_cover_page(
-                    cover_title, cover_sub, cover_footer
-                ) + pdf
-
-            if watermark and watermark_text:
-                pdf = apply_watermark(pdf, watermark_text)
-
-            if lock_pdf and user_pw:
-                pdf = protect_pdf(
-                    pdf, user_pw, owner_pw, allow_print, allow_copy
-                )
-
-            st.success("PDF generated")
             st.download_button("⬇ Download PDF", pdf, "text.pdf")
 
 # ==================================================
 # 🖼 IMAGE → PDF
 # ==================================================
-elif mode == "Image → PDF":
-    st.subheader("🖼 Image to PDF")
-    st.info("Paste images using Ctrl+V or upload files")
-
+with tab_image:
     images = st.file_uploader(
-        "Upload images",
-        type=["png", "jpg", "jpeg"],
-        accept_multiple_files=True
+        "Upload images", ["png", "jpg", "jpeg"], accept_multiple_files=True
     )
 
-    use_ocr = st.checkbox(
-        "🧠 Extract text (OCR)",
-        disabled=not OCR_AVAILABLE
-    )
-
-    lock_img = st.checkbox("🔐 Password protect PDF")
-    img_pw = st.text_input("Password", type="password") if lock_img else None
+    use_ocr = st.checkbox("🧠 Extract text (OCR)", disabled=not OCR_AVAILABLE)
 
     if images:
         pil_images = [Image.open(i).convert("RGB") for i in images]
@@ -155,81 +101,115 @@ elif mode == "Image → PDF":
             else:
                 pdf = generate_image_pdf(pil_images)
 
-            if lock_img and img_pw:
-                pdf = protect_pdf(pdf, img_pw)
-
-            st.success("PDF generated")
             st.download_button("⬇ Download PDF", pdf, "images.pdf")
 
 # ==================================================
 # 🧾 INVOICE → PDF
 # ==================================================
-elif mode == "Invoice → PDF":
-    st.subheader("🧾 Invoice Generator")
-
-    template = st.selectbox(
-        "Invoice Template",
-        ["Freelance", "Company", "Retail (GST)", "International"]
+with tab_invoice:
+    seller = st.text_input("Your Name / Company")
+    client = st.text_input("Client Name")
+    invoice_no = st.text_input(
+        "Invoice Number", f"INV-{date.today().strftime('%Y%m%d')}"
     )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        seller = st.text_input("Your Name / Company")
-        contact = st.text_input("Contact Details")
-    with col2:
-        client = st.text_input("Client Name")
-        invoice_no = st.text_input(
-            "Invoice Number",
-            f"INV-{date.today().strftime('%Y%m%d')}"
-        )
-
-    currency = "₹"
-    tax_rate = 0.0
-    if template == "Retail (GST)":
-        tax_rate = st.slider("GST %", 0, 28, 18) / 100
-    elif template == "International":
-        currency = "USD"
-        tax_rate = st.slider("Tax %", 0, 30, 0) / 100
-
-    st.subheader("Items")
     items = []
     for i in range(3):
-        c1, c2, c3 = st.columns(3)
-        desc = c1.text_input(f"Description {i+1}")
-        qty = c2.number_input(f"Qty {i+1}", min_value=0, step=1)
-        rate = c3.number_input(f"Rate {i+1}", min_value=0)
-
+        desc = st.text_input(f"Item {i+1}")
+        qty = st.number_input(f"Qty {i+1}", 0, 100, 1)
+        rate = st.number_input(f"Rate {i+1}", 0)
         if desc:
             items.append({"desc": desc, "qty": qty, "rate": rate})
 
-    notes = st.text_area("Notes", "Thank you for your business!")
-
-    if st.button("📄 Generate Invoice PDF", use_container_width=True):
+    if st.button("📄 Generate Invoice", use_container_width=True):
         if not seller or not client or not items:
-            st.warning("Fill all required fields.")
+            st.warning("Missing fields")
         else:
-            data = {
+            pdf = generate_invoice_pdf({
                 "seller": seller,
-                "seller_contact": contact,
                 "client": client,
                 "invoice_no": invoice_no,
-                "date": date.today().strftime("%d %b %Y"),
                 "items": items,
-                "tax_rate": tax_rate,
-                "currency": currency,
-                "notes": notes,
-            }
+                "date": date.today().strftime("%d %b %Y"),
+            })
+            st.download_button("⬇ Download Invoice", pdf, "invoice.pdf")
 
-            pdf = generate_invoice_pdf(data)
+# ==================================================
+# 🤖 PDF CHAT (RAG)
+# ==================================================
+with tab_rag:
+    st.subheader("🤖 Chat with your PDFs")
+    st.caption("Answers are extracted only from uploaded PDFs")
 
-            st.success("Invoice generated")
-            st.download_button(
-                "⬇ Download Invoice",
-                pdf,
-                "invoice.pdf"
+    if "rag_index" not in st.session_state:
+        st.session_state.rag_index = None
+        st.session_state.rag_chunks = None
+
+    pdfs = st.file_uploader(
+        "Upload PDFs", ["pdf"], accept_multiple_files=True
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("📚 Index PDFs", use_container_width=True):
+            if not pdfs:
+                st.warning("Upload PDFs first")
+            else:
+                with st.spinner("Indexing..."):
+                    docs = extract_pdf_text(pdfs)
+                    chunks = chunk_text(docs)
+                    index, _, stored = build_faiss_index(chunks)
+                    st.session_state.rag_index = index
+                    st.session_state.rag_chunks = stored
+                st.success("PDFs indexed")
+
+    with col2:
+        if st.button("🗑 Clear Index", use_container_width=True):
+            st.session_state.rag_index = None
+            st.session_state.rag_chunks = None
+            st.success("Cleared")
+
+    st.divider()
+
+    if st.session_state.rag_index:
+        q = st.text_input("Ask a question from the PDFs")
+
+        if q:
+            results = search(
+                q,
+                st.session_state.rag_index,
+                st.session_state.rag_chunks,
+                k=5,
             )
 
+            # ---------- FIX 1: Deduplicate ----------
+            seen = set()
+            unique = []
+            for r in results:
+                t = r["text"].strip()
+                if t and t not in seen:
+                    seen.add(t)
+                    unique.append(t)
+
+            from rag_utils import generate_llm_answer
+
+            results = search(
+                q,
+                st.session_state.rag_index,
+                st.session_state.rag_chunks,
+                k=5
+            )
+
+            answer = generate_llm_answer(q, results)
+
+            st.subheader("📘 Answer")
+            st.write(answer)
+
+            with st.expander("📎 Sources"):
+                for r in results:
+                    st.markdown(f"- **{r['source']}** (Page {r['page']})")
 
 # ---------- FOOTER ----------
 st.markdown("---")
-st.caption("PDF Maker Pro • Text • Images • Invoices • Secure")
+st.caption("PDF Maker Pro • Text • Images • Invoices • Secure • RAG AI")

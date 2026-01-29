@@ -45,33 +45,40 @@ HEADING_STYLE = ParagraphStyle(
 
 # ---------------- TEXT → PDF ----------------
 
-def generate_text_pdf(text: str) -> bytes:
-    buffer = BytesIO()
+def generate_text_pdf(
+    text,
+    font_size=12,
+    line_spacing=None,
+    margin=0
+):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    import io
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=0,
-        leftMargin=0,
-        topMargin=0,
-        bottomMargin=0
-    )
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
 
-    story = []
+    x = margin
+    y = height - margin
+
+    if line_spacing is None:
+        line_spacing = font_size + 2
+
+    c.setFont("Helvetica", font_size)
 
     for line in text.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
+        if y <= margin:
+            c.showPage()
+            c.setFont("Helvetica", font_size)
+            y = height - margin
+        c.drawString(x, y, line)
+        y -= line_spacing
 
-        # Simple heading detection
-        if line.isupper() or len(line) < 40:
-            story.append(Paragraph(line, HEADING_STYLE))
-        else:
-            story.append(Paragraph(line, BODY_STYLE))
-
-    doc.build(story)
+    c.save()
+    buffer.seek(0)
     return buffer.getvalue()
+
 
 # ---------------- IMAGE → PDF ----------------
 
